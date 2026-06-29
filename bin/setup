@@ -64,6 +64,13 @@ else
   fail "Missing required tool: docker (with the compose plugin) — see README.md Prerequisites."
 fi
 
+# The compose check above confirms the CLI is installed, but the daemon can still
+# be stopped. Catch that here so we fail with a clear message instead of later at
+# `docker compose up`.
+if ! docker info >/dev/null 2>&1; then
+  fail "Docker is installed but the daemon isn't running — start Docker Desktop (or the docker service) and re-run."
+fi
+
 PHP_VERSION="$(php -r 'echo PHP_VERSION;')"
 if php -r 'exit(PHP_VERSION_ID < 80400 ? 1 : 0);'; then
   info "PHP $PHP_VERSION detected"
