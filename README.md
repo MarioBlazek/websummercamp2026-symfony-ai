@@ -64,7 +64,7 @@ The fastest path — one command installs dependencies, starts the database, pre
 `.env.local`, and runs migrations:
 
 ```bash
-git clone <this-repo-url> && cd summercamp2026-symfony-ai
+git clone https://github.com/MarioBlazek/websummercamp2026-symfony-ai.git && cd websummercamp2026-symfony-ai
 bin/setup
 ```
 
@@ -76,7 +76,7 @@ dev server with `symfony serve`. Open http://localhost:8000.
 
 ```bash
 # 1. Clone the repo
-git clone <this-repo-url> && cd summercamp2026-symfony-ai
+git clone https://github.com/MarioBlazek/websummercamp2026-symfony-ai.git && cd websummercamp2026-symfony-ai
 
 # 2. Install PHP dependencies
 composer install
@@ -120,7 +120,7 @@ fill in; complete tags hold the full solution.
 
 ```bash
 git checkout step/chatbot-skeleton   # start an exercise
-git checkout master                  # back to the latest
+git checkout main                    # back to the latest
 ```
 
 ## Running tests

@@ -131,6 +131,15 @@ else
 fi
 
 # --- done -----------------------------------------------------------------------
+# `open` is macOS-only; Linux uses `xdg-open`. Fall back to a plain instruction.
+if command -v open >/dev/null 2>&1; then
+  OPEN_CMD="open"
+elif command -v xdg-open >/dev/null 2>&1; then
+  OPEN_CMD="xdg-open"
+else
+  OPEN_CMD=""
+fi
+
 KEY_VALUE="$(grep '^ANTHROPIC_API_KEY=' .env.local | head -n1 | cut -d= -f2-)"
 echo
 info "Setup complete 🎉"
@@ -141,7 +150,7 @@ cat <<EOF
 
 Next steps:
   ${BOLD}symfony serve${RESET}                 # start the dev server (or: php -S localhost:8000 -t public/)
-  open http://localhost:8000
+  ${OPEN_CMD:+$OPEN_CMD }http://localhost:8000
 
 Run the tests with:
   ${BOLD}php bin/phpunit${RESET}
