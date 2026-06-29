@@ -3,6 +3,8 @@
 A hands-on **Web Summer Camp** workshop on building production-grade AI features with the
 Symfony AI components and Anthropic Claude.
 
+🔗 **Session page:** https://websummercamp.com/2026/session/building-ai-powered-applications-with-symfony-ai
+
 > Artificial intelligence is transforming the way we build applications, but integrating LLMs
 > into production PHP systems comes with unique challenges. In this workshop you'll build
 > AI-powered features using Symfony AI components while tackling real-world concerns such as
@@ -58,6 +60,20 @@ No prior AI/ML knowledge required. An Anthropic API key will be provided on the 
 
 ## Setup
 
+The fastest path — one command installs dependencies, starts the database, prepares
+`.env.local`, and runs migrations:
+
+```bash
+git clone <this-repo-url> && cd summercamp2026-symfony-ai
+bin/setup
+```
+
+Then set `ANTHROPIC_API_KEY` in `.env.local` (key provided at the session) and start the
+dev server with `symfony serve`. Open http://localhost:8000.
+
+<details>
+<summary>Manual setup — what <code>bin/setup</code> does, step by step</summary>
+
 ```bash
 # 1. Clone the repo
 git clone <this-repo-url> && cd summercamp2026-symfony-ai
@@ -74,7 +90,10 @@ cp .env .env.local
 #    then edit .env.local and set ANTHROPIC_API_KEY=sk-ant-...
 
 # 5. Run the database migrations
-php bin/console doctrine:migrations:migrate
+#    Use `symfony console` so the random Docker host port is auto-injected into DATABASE_URL.
+symfony console doctrine:migrations:migrate
+#    Without the Symfony CLI, point DATABASE_URL at the mapped port from `docker compose ps`, then:
+#    php bin/console doctrine:migrations:migrate
 
 # 6. Start the dev server
 symfony serve
@@ -83,6 +102,8 @@ php -S localhost:8000 -t public/
 ```
 
 Then open http://localhost:8000.
+
+</details>
 
 ## Following along with git tags
 

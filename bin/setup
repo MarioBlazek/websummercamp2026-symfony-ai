@@ -1,0 +1,148 @@
+#!/usr/bin/env bash
+#
+# One-command project setup for the Web Summer Camp 2026 Symfony AI workshop.
+#
+#   bin/setup
+#
+# Idempotent: safe to re-run. It installs PHP dependencies, starts the database
+# (and mailer) containers, prepares .env.local, waits for the database to become
+# healthy, and runs any pending Doctrine migrations.
+set -euo pipefail
+
+# Always operate from the project root, regardless of where the script is called.
+cd "$(dirname "$0")/.."
+
+# --- pretty output --------------------------------------------------------------
+if [ -t 1 ]; then
+  BOLD=$'\033[1m'; GREEN=$'\033[32m'; YELLOW=$'\033[33m'; RED=$'\033[31m'
+  CYAN=$'\033[36m'; SUN=$'\033[33m'; RESET=$'\033[0m'
+else
+  BOLD=""; GREEN=""; YELLOW=""; RED=""; CYAN=""; SUN=""; RESET=""
+fi
+info()  { printf '%s==>%s %s\n' "$GREEN$BOLD" "$RESET" "$*"; }
+warn()  { printf '%s!  %s%s\n'  "$YELLOW"      "$*" "$RESET"; }
+fail()  { printf '%sx  %s%s\n'  "$RED"         "$*" "$RESET" >&2; exit 1; }
+
+banner() {
+  printf '%s' "$SUN"
+  cat <<'EOF'
+                    .   \   |   /   .
+                     '.  \  |  /  .'         ___
+          .'''''.      '. \ | / .'         (   )
+         :       :  - - -  ( O )  - - -      '-'
+          '.....'      .' / | \ '.
+            |  |     .'  / | | \  '.
+EOF
+  printf '%s%s' "$RESET" "$CYAN$BOLD"
+  cat <<'EOF'
+  __        __   _       ____                                        ____
+  \ \      / /__| |__   / ___| _   _ _ __ ___  _ __ ___   ___ _ __  / ___|__ _ _ __ ___  _ __
+   \ \ /\ / / _ \ '_ \  \___ \| | | | '_ ` _ \| '_ ` _ \ / _ \ '__|| |   / _` | '_ ` _ \| '_ \
+    \ V  V /  __/ |_) |  ___) | |_| | | | | | | | | | | |  __/ |   | |__| (_| | | | | | | |_) |
+     \_/\_/ \___|_.__/  |____/ \__,_|_| |_| |_|_| |_| |_|\___|_|    \____\__,_|_| |_| |_| .__/
+                                                                                        |_|
+EOF
+  printf '%s' "$RESET"
+  printf '   %sBuilding AI-Powered Applications with Symfony AI · 2026 · project setup%s\n\n' "$BOLD" "$RESET"
+}
+
+banner
+
+# --- prerequisites --------------------------------------------------------------
+info "Checking prerequisites"
+need() { command -v "$1" >/dev/null 2>&1 || fail "Missing required tool: $1 — see README.md Prerequisites."; }
+need php
+need composer
+need git
+
+# Docker Compose can be either `docker compose` (v2) or `docker-compose` (v1).
+if docker compose version >/dev/null 2>&1; then
+  DC=(docker compose)
+elif command -v docker-compose >/dev/null 2>&1; then
+  DC=(docker-compose)
+else
+  fail "Missing required tool: docker (with the compose plugin) — see README.md Prerequisites."
+fi
+
+PHP_VERSION="$(php -r 'echo PHP_VERSION;')"
+if php -r 'exit(PHP_VERSION_ID < 80400 ? 1 : 0);'; then
+  info "PHP $PHP_VERSION detected"
+else
+  warn "PHP $PHP_VERSION detected — this project requires PHP 8.4+. Continuing anyway."
+fi
+
+# Prefer the Symfony CLI for console commands: compose.override.yaml maps Postgres
+# to a random host port, and `symfony console` auto-injects the matching DATABASE_URL.
+# Plain `php bin/console` would try 127.0.0.1:5432 and fail to connect.
+if command -v symfony >/dev/null 2>&1; then
+  CONSOLE=(symfony console)
+else
+  CONSOLE=(php bin/console)
+  warn "Symfony CLI not found — using 'php bin/console'. If DB commands fail to connect,"
+  warn "install the Symfony CLI (https://symfony.com/download) or set DATABASE_URL to the"
+  warn "mapped host port shown by 'docker compose ps'."
+fi
+
+# --- 1. PHP dependencies --------------------------------------------------------
+info "Installing PHP dependencies (composer install)"
+composer install --no-interaction
+
+# --- 2. Local environment file --------------------------------------------------
+if [ -f .env.local ]; then
+  info ".env.local already exists — leaving it untouched"
+else
+  info "Creating .env.local from .env"
+  cp .env .env.local
+fi
+
+if ! grep -q '^ANTHROPIC_API_KEY=' .env.local; then
+  info "Adding ANTHROPIC_API_KEY placeholder to .env.local"
+  {
+    printf '\n'
+    printf '###> anthropic ###\n'
+    printf '# An API key is handed out at the session. Paste it here:\n'
+    printf 'ANTHROPIC_API_KEY=\n'
+    printf '###< anthropic ###\n'
+  } >> .env.local
+fi
+
+# --- 3. Start the database (and mailer) -----------------------------------------
+info "Starting Docker services (database, mailer)"
+"${DC[@]}" up -d database mailer 2>/dev/null || "${DC[@]}" up -d database
+
+# --- 4. Wait for the database to be ready ---------------------------------------
+info "Waiting for the database to become healthy"
+DB_CID="$("${DC[@]}" ps -q database || true)"
+if [ -n "$DB_CID" ]; then
+  for _ in $(seq 1 30); do
+    status="$(docker inspect -f '{{ if .State.Health }}{{ .State.Health.Status }}{{ else }}none{{ end }}' "$DB_CID" 2>/dev/null || echo none)"
+    if [ "$status" = "healthy" ] || [ "$status" = "none" ]; then break; fi
+    printf '.'; sleep 2
+  done
+  printf '\n'
+fi
+
+# --- 5. Database migrations -----------------------------------------------------
+if ls migrations/Version*.php >/dev/null 2>&1; then
+  info "Running database migrations"
+  "${CONSOLE[@]}" doctrine:migrations:migrate --no-interaction --allow-no-migration
+else
+  info "No migrations to run yet (skipping)"
+fi
+
+# --- done -----------------------------------------------------------------------
+KEY_VALUE="$(grep '^ANTHROPIC_API_KEY=' .env.local | head -n1 | cut -d= -f2-)"
+echo
+info "Setup complete 🎉"
+if [ -z "$KEY_VALUE" ]; then
+  warn "Don't forget to set ANTHROPIC_API_KEY in .env.local (key provided at the session)."
+fi
+cat <<EOF
+
+Next steps:
+  ${BOLD}symfony serve${RESET}                 # start the dev server (or: php -S localhost:8000 -t public/)
+  open http://localhost:8000
+
+Run the tests with:
+  ${BOLD}php bin/phpunit${RESET}
+EOF
